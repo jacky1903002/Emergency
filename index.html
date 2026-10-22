@@ -234,7 +234,7 @@
         <div id="emptyState" class="hidden py-16 text-center text-gray-400">
           <i class="fa-solid fa-clipboard-list text-5xl mb-3 text-cream-300"></i>
           <p class="text-base font-semibold">目前尚無巡廠紀錄</p>
-          <p class="text-xs text-gray-400 mt-1">請透過 Excel 匯入或聯絡管理員建立初始資料列</p>
+          <p class="text-xs text-gray-400 mt-1">請透過 Excel 匯入建立初始資料列</p>
         </div>
       </div>
     </div>
@@ -245,7 +245,7 @@
         <!-- KPI Cards -->
         <div class="bg-white p-6 rounded-2xl border border-cream-200 shadow-sm flex items-center justify-between">
           <div>
-            <p class="text-xs font-bold text-gray-400">總巡檢次數</p>
+            <p class="text-xs font-bold text-gray-400">已簽名巡檢次數</p>
             <h3 id="statTotal" class="text-3xl font-black text-gray-900 mt-1">0</h3>
           </div>
           <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-xl">
@@ -255,7 +255,7 @@
 
         <div class="bg-white p-6 rounded-2xl border border-cream-200 shadow-sm flex items-center justify-between">
           <div>
-            <p class="text-xs font-bold text-gray-400">最常見事故原因</p>
+            <p class="text-xs font-bold text-gray-400">最常見事故原因 (已簽名)</p>
             <h3 id="statTopReason" class="text-2xl font-black text-amber-700 mt-1">無</h3>
           </div>
           <div class="w-12 h-12 rounded-xl bg-red-100 text-red-700 flex items-center justify-center text-xl">
@@ -265,7 +265,7 @@
 
         <div class="bg-white p-6 rounded-2xl border border-cream-200 shadow-sm flex items-center justify-between">
           <div>
-            <p class="text-xs font-bold text-gray-400">簽名完成率</p>
+            <p class="text-xs font-bold text-gray-400">總體簽名完成率</p>
             <h3 id="statSignRate" class="text-3xl font-black text-emerald-700 mt-1">0%</h3>
           </div>
           <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl">
@@ -278,7 +278,7 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white p-6 rounded-2xl border border-cream-200 shadow-sm">
           <h4 class="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-chart-pie text-amber-700"></i> 事故事由分類統計
+            <i class="fa-solid fa-chart-pie text-amber-700"></i> 事故事由分類統計 (僅限已簽名)
           </h4>
           <div class="relative h-64">
             <canvas id="reasonChart"></canvas>
@@ -287,7 +287,7 @@
 
         <div class="bg-white p-6 rounded-2xl border border-cream-200 shadow-sm">
           <h4 class="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-chart-column text-amber-700"></i> 巡網人員巡查次數統計
+            <i class="fa-solid fa-chart-column text-amber-700"></i> 巡廠人員巡查次數統計 (僅限已簽名)
           </h4>
           <div class="relative h-64">
             <canvas id="personChart"></canvas>
@@ -434,7 +434,7 @@
       }
     };
 
-    // User Login (Enhanced with detailed error output)
+    // User Login
     window.handleLogin = async (e) => {
       e.preventDefault();
       const email = document.getElementById('loginEmail').value.trim();
@@ -466,20 +466,17 @@
           Object.keys(data).forEach(key => {
             window.recordsData.push({ id: key, ...data[key] });
           });
-          // Sort by Order
           window.recordsData.sort((a, b) => (a.order || 0) - (b.order || 0));
         }
 
         renderTable();
         renderCharts();
         
-        // Update Last Saved Time
         const now = new Date();
         document.getElementById('lastSavedTime').textContent = now.toLocaleString('zh-TW', { hour12: false });
       });
     }
 
-    // Helper: Convert YYMMDD HH:mm to ISO Datetime Local string (YYYY-MM-THH:mm)
     function parseFormattedDTToPicker(dtStr) {
       if (!dtStr || dtStr.length < 11) return '';
       try {
@@ -493,7 +490,6 @@
       }
     }
 
-    // Helper: Convert Date object or ISO string to YYMMDD HH:mm
     function formatPickerToYYMMDD(isoStr) {
       if (!isoStr) return '';
       const d = new Date(isoStr);
@@ -506,11 +502,10 @@
       return `${yy}${mm}${dd} ${hh}:${min}`;
     }
 
-    // Render Table Body with In-line Editable Controls
+    // Render Table Body
     function renderTable() {
       const tbody = document.getElementById('recordsTableBody');
       const emptyState = document.getElementById('emptyState');
-      
       const activeElId = document.activeElement ? document.activeElement.id : null;
       
       tbody.innerHTML = '';
@@ -526,7 +521,6 @@
         tr.dataset.id = item.id;
         tr.className = "hover:bg-cream-50 transition border-b border-cream-100";
 
-        // Formatted Signature Display
         let signatureHtml = '';
         if (item.signature) {
           signatureHtml = `
@@ -544,7 +538,6 @@
           `;
         }
 
-        // Reason Options HTML
         const reasonSelectHtml = REASON_OPTIONS.map(opt => `
           <option value="${opt}" ${item.reason === opt ? 'selected' : ''}>${opt}</option>
         `).join('');
@@ -606,7 +599,6 @@
       }
     }
 
-    // In-line Field Updating
     window.updateRecordField = (id, field, value) => {
       let valToSave = value;
       if (field === 'dateTime') {
@@ -617,7 +609,6 @@
       });
     };
 
-    // Save Drag and Drop Order
     function saveNewOrder() {
       const rows = document.querySelectorAll('#recordsTableBody tr');
       rows.forEach((row, idx) => {
@@ -628,7 +619,6 @@
       });
     }
 
-    // Direct Signature Action
     window.signRecord = (id) => {
       if (!window.currentUser) return;
       const signerName = window.currentUser.displayName || window.currentUser.email.split('@')[0];
@@ -638,14 +628,12 @@
       update(ref(db, `patrol_records/${id}`), { signature: signString });
     };
 
-    // Delete Record
     window.deleteRecord = (id) => {
       if (confirm('確定要刪除這筆巡廠紀錄嗎？此動作無法復原。')) {
         remove(ref(db, `patrol_records/${id}`));
       }
     };
 
-    // View Switching
     window.switchMainView = (view) => {
       const tableView = document.getElementById('tableViewSection');
       const chartView = document.getElementById('chartViewSection');
@@ -666,18 +654,21 @@
       }
     };
 
-    // Analytics Chart.js Rendering
+    // Analytics Chart.js Rendering (只統計有簽名的紀錄)
     function renderCharts() {
-      const data = window.recordsData;
+      const allData = window.recordsData;
+      const signedRecords = allData.filter(d => d.signature && d.signature.trim() !== '');
 
-      document.getElementById('statTotal').textContent = data.length;
+      // KPIs
+      document.getElementById('statTotal').textContent = signedRecords.length;
       
-      const signedCount = data.filter(d => d.signature && d.signature.trim() !== '').length;
-      const rate = data.length > 0 ? Math.round((signedCount / data.length) * 100) : 0;
+      const signedCount = signedRecords.length;
+      const rate = allData.length > 0 ? Math.round((signedCount / allData.length) * 100) : 0;
       document.getElementById('statSignRate').textContent = `${rate}%`;
 
+      // Reason Counts (僅限有簽名者)
       const reasonMap = {};
-      data.forEach(d => {
+      signedRecords.forEach(d => {
         const r = d.reason || '其他';
         reasonMap[r] = (reasonMap[r] || 0) + 1;
       });
@@ -692,6 +683,7 @@
       });
       document.getElementById('statTopReason').textContent = topReason;
 
+      // Render Reason Pie Chart
       const reasonCtx = document.getElementById('reasonChart').getContext('2d');
       if (window.reasonChartObj) window.reasonChartObj.destroy();
 
@@ -713,8 +705,9 @@
         }
       });
 
+      // Person Bar Chart (僅限有簽名者)
       const personMap = {};
-      data.forEach(d => {
+      signedRecords.forEach(d => {
         const p = d.inspector || '未指定';
         personMap[p] = (personMap[p] || 0) + 1;
       });
@@ -727,7 +720,7 @@
         data: {
           labels: Object.keys(personMap),
           datasets: [{
-            label: '巡查次數',
+            label: '已簽名巡查次數',
             data: Object.values(personMap),
             backgroundColor: '#B45309'
           }]
@@ -745,7 +738,6 @@
       });
     }
 
-    // Export Excel
     window.exportToExcel = () => {
       if (window.recordsData.length === 0) {
         alert('無紀錄可匯出');
@@ -768,7 +760,6 @@
       XLSX.writeFile(workbook, `巡廠紀錄表_${new Date().toISOString().slice(0,10)}.xlsx`);
     };
 
-    // Import Excel
     window.importExcel = (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -804,7 +795,6 @@
       reader.readAsArrayBuffer(file);
     };
 
-    // Export PNG
     window.exportToPNG = () => {
       const target = document.getElementById('exportableArea');
       html2canvas(target, {
@@ -818,7 +808,6 @@
       });
     };
 
-    // Custom Logo Trigger & Local Storage
     window.triggerLogoUpload = () => {
       document.getElementById('logoFileInput').click();
     };
