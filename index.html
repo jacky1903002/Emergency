@@ -102,7 +102,7 @@
           <input type="password" id="loginPassword" required class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none text-gray-900" placeholder="••••••••">
         </div>
         <button type="submit" class="w-full bg-amber-700 hover:bg-amber-800 text-white font-bold py-3 rounded-lg shadow-md transition duration-200">
-          立即登入 <i class="fa-solid fa-arrow-right-to-bracket ml-1"></i>
+          進入系統 <i class="fa-solid fa-arrow-right-to-bracket ml-1"></i>
         </button>
       </form>
 
@@ -133,7 +133,6 @@
       
       <!-- Logo + 標題 -->
       <div class="flex items-center space-x-4">
-        <!-- 可連結或自訂圖片區域 -->
         <div class="relative group">
           <div id="logoContainer" class="w-12 h-12 rounded-xl bg-cream-100 border border-cream-300 flex items-center justify-center overflow-hidden shadow-inner cursor-pointer" onclick="triggerLogoUpload()" title="點擊更換企業Logo">
             <img id="customLogo" src="" alt="Company Logo" class="hidden w-full h-full object-cover">
@@ -196,8 +195,17 @@
 
       <!-- 功能操作按鈕群 -->
       <div class="flex flex-wrap items-center gap-2">
+        <button onclick="addNewRecordRow()" class="bg-amber-700 hover:bg-amber-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm flex items-center gap-2 transition">
+          <i class="fa-solid fa-plus"></i> 新增單列
+        </button>
+
+        <!-- 批量複製按鈕 -->
+        <button id="batchCopyBtn" onclick="duplicateSelectedRows()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm flex items-center gap-2 transition">
+          <i class="fa-solid fa-copy"></i> 複製所選列 (<span id="selectedCountBadge">0</span>)
+        </button>
+
         <button onclick="exportToExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm flex items-center gap-2 transition">
-          <i class="fa-solid fa-file-excel"></i> 一鍵匯出 Excel
+          <i class="fa-solid fa-file-excel"></i> 匯出 Excel
         </button>
         <label class="bg-teal-700 hover:bg-teal-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm flex items-center gap-2 transition cursor-pointer">
           <i class="fa-solid fa-file-import"></i> 匯入 Excel
@@ -211,18 +219,49 @@
 
     <!-- 視圖 1: 巡廠紀錄表區塊 -->
     <div id="tableViewSection" class="space-y-4">
+      
+      <!-- 簽名與複製規則備註 -->
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs sm:text-sm text-amber-900 flex items-start gap-3 shadow-sm">
+        <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shrink-0 mt-0.5">
+          <i class="fa-solid fa-circle-info"></i>
+        </div>
+        <div class="space-y-1">
+          <h4 class="font-black text-amber-950 text-sm">巡檢簽名與批量複製規則說明</h4>
+          <p class="text-amber-800 leading-relaxed">
+            1. <strong>批量勾選與複製</strong>：可使用最左側核取方塊（Checkbox）勾選一至多個列位，點擊「<i class="fa-solid fa-copy"></i> 複製所選列」即可自動承襲資料並追加最新紀錄列（巡檢時間更新為最新，簽名重置）。<br>
+            2. <strong>簽名不設限鎖定</strong>：所有簽名欄位皆可重複點擊簽名，後續簽名會直接覆蓋前一次的簽名。<br>
+            3. <strong>動態顏色辨識機制</strong>：系統會自動累計並記錄簽名次數（標記 <code class="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-amber-900">#次數</code>），並以不同顏色顯示：
+            <span class="inline-block mt-1 font-semibold">
+              <span class="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mr-1">第1次 綠色</span>
+              <span class="text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded mr-1">第2次 藍色</span>
+              <span class="text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded mr-1">第3次 紫色</span>
+              <span class="text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded mr-1">第4次 琥珀色</span>
+              <span class="text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded mr-1">第5次 紅色</span>
+              <span class="text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded mr-1">第6次 青色</span>
+              <span class="text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded mr-1">第7次 粉紅</span>
+              <span class="text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded mr-1">第8次 靛藍</span>
+              <span class="text-lime-700 bg-lime-100 px-1.5 py-0.5 rounded mr-1">第9次 黃綠</span>
+              <span class="text-stone-700 bg-stone-200 px-1.5 py-0.5 rounded">第10次+ 石板灰 (依序循環)</span>
+            </span>
+          </p>
+        </div>
+      </div>
+
       <div id="exportableArea" class="bg-white rounded-2xl shadow-sm border border-cream-200 overflow-hidden p-1">
         <div class="overflow-x-auto custom-scrollbar">
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="bg-cream-100 text-gray-900 text-sm font-black border-b border-cream-200 uppercase tracking-wider">
-                <th class="py-4 px-3 text-center w-12">排序</th>
-                <th class="py-4 px-4 w-28">編號</th>
-                <th class="py-4 px-4 w-36">巡廠人員</th>
+                <th class="py-4 px-3 text-center w-10 no-export">
+                  <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllRows(this.checked)" class="w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500 cursor-pointer" title="全選 / 全不選">
+                </th>
+                <th class="py-4 px-2 text-center w-10">排序</th>
+                <th class="py-4 px-3 w-20">編號</th>
+                <th class="py-4 px-4 w-40">巡廠人員 (雙擊編輯)</th>
                 <th class="py-4 px-4 w-52">巡廠日期時間</th>
                 <th class="py-4 px-4 w-36">事由</th>
                 <th class="py-4 px-4">備註 (異常回報)</th>
-                <th class="py-4 px-4 w-48 text-center">巡檢簽名</th>
+                <th class="py-4 px-4 w-52 text-center">巡檢簽名 (可重複覆蓋)</th>
                 <th class="py-4 px-4 w-20 text-center no-export">操作</th>
               </tr>
             </thead>
@@ -234,7 +273,7 @@
         <div id="emptyState" class="hidden py-16 text-center text-gray-400">
           <i class="fa-solid fa-clipboard-list text-5xl mb-3 text-cream-300"></i>
           <p class="text-base font-semibold">目前尚無巡廠紀錄</p>
-          <p class="text-xs text-gray-400 mt-1">請透過 Excel 匯入建立初始資料列</p>
+          <p class="text-xs text-gray-400 mt-1">點擊上方「新增單列」按鈕新增第一筆紀錄</p>
         </div>
       </div>
     </div>
@@ -346,19 +385,26 @@
     // Global App States
     window.currentUser = null;
     window.recordsData = [];
+    window.selectedRowIds = new Set(); // 勾選複製的 ID 集合
     window.sortableInstance = null;
     window.reasonChartObj = null;
     window.personChartObj = null;
 
-    // Specified Inspectors List
-    const INSPECTORS = [
-      "蔡儀誠","鄭玄曄","梁寶文","陳建華","陳秉鉞","彭顏偉",
-      "楊志偉","林辰翰","蔡旻哲","王盈憲","黃志浩","李律賢",
-      "戴群津","秦若庭","劉盈春","劉金勳","彭俊銘","簡志洋",
-      "張益盛","王書彬","王振洲","呂文頡","陳志銘","徐柏欽"
-    ];
-
     const REASON_OPTIONS = ["天災", "人禍", "地震", "颱風", "其他"];
+
+    // 10種簽名對應的顏色配置
+    const SIGN_COLORS = {
+      1: 'bg-emerald-50 text-emerald-800 border-emerald-200',   // 綠色
+      2: 'bg-blue-50 text-blue-800 border-blue-200',         // 藍色
+      3: 'bg-purple-50 text-purple-800 border-purple-200',     // 紫色
+      4: 'bg-amber-50 text-amber-800 border-amber-200',       // 琥珀色
+      5: 'bg-rose-50 text-rose-800 border-rose-200',         // 紅色
+      6: 'bg-teal-50 text-teal-800 border-teal-200',         // 青色
+      7: 'bg-pink-50 text-pink-800 border-pink-200',         // 粉紅
+      8: 'bg-indigo-50 text-indigo-800 border-indigo-200',   // 靛藍
+      9: 'bg-lime-50 text-lime-800 border-lime-200',         // 黃綠
+      10: 'bg-stone-200 text-stone-800 border-stone-300'     // 石板灰
+    };
 
     // Monitor Connection Status
     const connectedRef = ref(db, ".info/connected");
@@ -386,7 +432,6 @@
         document.getElementById('userNameDisplay').textContent = user.displayName || user.email.split('@')[0];
         document.getElementById('userEmailDisplay').textContent = user.email;
 
-        // Load Database Listeners
         initDatabaseListener();
       } else {
         window.currentUser = null;
@@ -445,7 +490,7 @@
         await signInWithEmailAndPassword(auth, email, pwd);
       } catch (err) {
         errBox.classList.remove('hidden');
-        document.getElementById('authErrorText').textContent = `登入失敗 (${err.code})：請確認 Firebase 是否已啟用 Email 登入或帳密是否正確。`;
+        document.getElementById('authErrorText').textContent = `登入失敗 (${err.code})：請確認帳密是否正確。`;
       }
     };
 
@@ -502,8 +547,119 @@
       return `${yy}${mm}${dd} ${hh}:${min}`;
     }
 
+    // 取得當前時間格式化字串 YYMMDD HH:mm
+    function getCurrentFormattedTime() {
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      return `${yy}${mm}${dd} ${hh}:${min}`;
+    }
+
+    // 重新校正編號 (1, 2, 3...)
+    function syncAutoNumbers() {
+      const updates = {};
+      window.recordsData.forEach((item, index) => {
+        const autoSeq = index + 1;
+        if (item.code !== autoSeq || item.order !== index) {
+          item.code = autoSeq;
+          item.order = index;
+          updates[`patrol_records/${item.id}/code`] = autoSeq;
+          updates[`patrol_records/${item.id}/order`] = index;
+        }
+      });
+      if (Object.keys(updates).length > 0) {
+        update(ref(db), updates);
+      }
+    }
+
+    // 更新選取數量 UI 標籤
+    function updateSelectedBadge() {
+      const badge = document.getElementById('selectedCountBadge');
+      if (badge) {
+        badge.textContent = window.selectedRowIds.size;
+      }
+      
+      const selectAll = document.getElementById('selectAllCheckbox');
+      if (selectAll) {
+        if (window.recordsData.length > 0 && window.selectedRowIds.size === window.recordsData.length) {
+          selectAll.checked = true;
+          selectAll.indeterminate = false;
+        } else if (window.selectedRowIds.size > 0) {
+          selectAll.checked = false;
+          selectAll.indeterminate = true;
+        } else {
+          selectAll.checked = false;
+          selectAll.indeterminate = false;
+        }
+      }
+    }
+
+    // 勾選單一列
+    window.toggleSelectRow = (id, isChecked) => {
+      if (isChecked) {
+        window.selectedRowIds.add(id);
+      } else {
+        window.selectedRowIds.delete(id);
+      }
+      updateSelectedBadge();
+    };
+
+    // 全選 / 全不選
+    window.toggleSelectAllRows = (isChecked) => {
+      window.selectedRowIds.clear();
+      if (isChecked) {
+        window.recordsData.forEach(r => window.selectedRowIds.add(r.id));
+      }
+      document.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.checked = isChecked;
+      });
+      updateSelectedBadge();
+    };
+
+    // 複製所選列位並追加新增最新列
+    window.duplicateSelectedRows = () => {
+      if (window.selectedRowIds.size === 0) {
+        alert('請先勾選至少一個巡檢列位！');
+        return;
+      }
+
+      // 篩選出目前勾選的資料項目，並依原本順序排列
+      const itemsToDuplicate = window.recordsData.filter(r => window.selectedRowIds.has(r.id));
+      
+      const nowFormatted = getCurrentFormattedTime();
+      let startOrder = window.recordsData.length;
+
+      itemsToDuplicate.forEach((originalItem, index) => {
+        const newRef = push(ref(db, 'patrol_records'));
+        const newOrder = startOrder + index;
+
+        set(newRef, {
+          code: newOrder + 1,
+          inspector: originalItem.inspector || '巡檢人員',
+          dateTime: nowFormatted, // 更新巡檢時間為最新當前時間
+          reason: originalItem.reason || '其他',
+          note: originalItem.note || '',
+          signature: '', // 簽名重置
+          signCount: 0,
+          order: newOrder,
+          createdAt: serverTimestamp()
+        });
+      });
+
+      // 清空選取標記
+      window.selectedRowIds.clear();
+      updateSelectedBadge();
+    };
+
     // Render Table Body
     function renderTable() {
+      window.recordsData.forEach((item, idx) => {
+        item.code = idx + 1;
+      });
+
       const tbody = document.getElementById('recordsTableBody');
       const emptyState = document.getElementById('emptyState');
       const activeElId = document.activeElement ? document.activeElement.id : null;
@@ -512,6 +668,7 @@
 
       if (window.recordsData.length === 0) {
         emptyState.classList.remove('hidden');
+        updateSelectedBadge();
         return;
       }
       emptyState.classList.add('hidden');
@@ -521,12 +678,18 @@
         tr.dataset.id = item.id;
         tr.className = "hover:bg-cream-50 transition border-b border-cream-100";
 
+        // 簽名與動態顏色對應 (次數循環計算)
         let signatureHtml = '';
+        const signCount = item.signCount || 0;
+        
         if (item.signature) {
+          const colorIndex = ((signCount - 1) % 10) + 1;
+          const colorClass = SIGN_COLORS[colorIndex] || SIGN_COLORS[1];
           signatureHtml = `
-            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
-              <i class="fa-solid fa-check"></i>
+            <div onclick="signRecord('${item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${colorClass} border text-xs font-bold cursor-pointer hover:opacity-80 transition shadow-sm select-none" title="已簽名 (#${signCount})，點擊可再次覆蓋簽名">
+              <i class="fa-solid fa-signature"></i>
               <span>${escapeHtml(item.signature)}</span>
+              <span class="text-[10px] opacity-75 bg-black/10 px-1.5 py-0.2 rounded">#${signCount}</span>
             </div>
           `;
         } else {
@@ -543,13 +706,24 @@
         `).join('');
 
         const pickerValue = parseFormattedDTToPicker(item.dateTime);
+        const isChecked = window.selectedRowIds.has(item.id);
 
         tr.innerHTML = `
-          <td class="py-3.5 px-3 text-center drag-handle text-gray-400 hover:text-amber-700">
+          <td class="py-3.5 px-3 text-center no-export">
+            <input type="checkbox" 
+                   value="${item.id}" 
+                   ${isChecked ? 'checked' : ''} 
+                   onchange="toggleSelectRow('${item.id}', this.checked)"
+                   class="row-checkbox w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500 cursor-pointer">
+          </td>
+          <td class="py-3.5 px-2 text-center drag-handle text-gray-400 hover:text-amber-700">
             <i class="fa-solid fa-grip-vertical"></i>
           </td>
-          <td class="py-3.5 px-4 font-mono font-bold text-gray-900">${escapeHtml(item.code || '')}</td>
-          <td class="py-3.5 px-4 text-gray-900 font-bold select-none">${escapeHtml(item.inspector || '')}</td>
+          <td class="py-3.5 px-3 font-mono font-bold text-gray-900">${idx + 1}</td>
+          <!-- 雙擊編輯巡檢人員 -->
+          <td class="py-3.5 px-4 text-gray-900 font-bold select-none cursor-pointer" ondblclick="enableInspectorEdit(this, '${item.id}', '${escapeHtml(item.inspector || '')}')" title="雙擊可修改姓名">
+            <span class="border-b border-dashed border-gray-400 hover:border-amber-700 hover:text-amber-700">${escapeHtml(item.inspector || '點擊兩下設定')}</span>
+          </td>
           <td class="py-2 px-3">
             <input type="datetime-local" 
                    id="dt_${item.id}"
@@ -574,7 +748,7 @@
           </td>
           <td class="py-3.5 px-4 text-center">${signatureHtml}</td>
           <td class="py-3.5 px-4 text-center no-export">
-            <button onclick="deleteRecord('${item.id}')" class="p-1.5 rounded-md text-gray-400 hover:text-red-700 hover:bg-red-50 transition" title="刪除">
+            <button onclick="deleteRecord('${item.id}')" class="p-1.5 rounded-md text-gray-400 hover:text-red-700 hover:bg-red-50 transition" title="刪除此列">
               <i class="fa-solid fa-trash-can"></i>
             </button>
           </td>
@@ -597,7 +771,84 @@
           }
         });
       }
+
+      updateSelectedBadge();
+      syncAutoNumbers();
     }
+
+    // 新增單個紀錄列
+    window.addNewRecordRow = () => {
+      const defaultName = window.currentUser ? (window.currentUser.displayName || window.currentUser.email.split('@')[0]) : '巡檢人員';
+      const formattedDT = getCurrentFormattedTime();
+
+      const newRef = push(ref(db, 'patrol_records'));
+      const newIndex = window.recordsData.length;
+
+      set(newRef, {
+        code: newIndex + 1,
+        inspector: defaultName,
+        dateTime: formattedDT,
+        reason: '其他',
+        note: '',
+        signature: '',
+        signCount: 0,
+        order: newIndex,
+        createdAt: serverTimestamp()
+      });
+    };
+
+    // 雙擊編輯巡檢人員
+    window.enableInspectorEdit = (tdElement, recordId, currentValue) => {
+      if (tdElement.querySelector('input')) return;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentValue === '點擊兩下設定' ? '' : currentValue;
+      input.className = 'w-full px-2 py-1 text-xs font-bold rounded border border-amber-500 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white';
+      
+      let isSaved = false;
+      const saveFunc = () => {
+        if (isSaved) return;
+        isSaved = true;
+        const newName = input.value.trim() || '巡檢人員';
+        updateRecordField(recordId, 'inspector', newName);
+      };
+
+      input.onblur = saveFunc;
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          saveFunc();
+        }
+      };
+
+      tdElement.innerHTML = '';
+      tdElement.appendChild(input);
+      input.focus();
+    };
+
+    // 刪除列
+    window.deleteRecord = (id) => {
+      if (confirm('確定要刪除這筆巡廠紀錄嗎？刪除後編號將會自動重新排列。')) {
+        window.selectedRowIds.delete(id);
+        remove(ref(db, `patrol_records/${id}`));
+      }
+    };
+
+    // 簽名功能（支援多次簽名覆蓋、累計次數與動態顏色）
+    window.signRecord = (id) => {
+      if (!window.currentUser) return;
+      const signerName = window.currentUser.displayName || window.currentUser.email.split('@')[0];
+      const timeStr = new Date().toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+      const signString = `${signerName} (${timeStr})`;
+
+      const record = window.recordsData.find(r => r.id === id);
+      const nextCount = (record && record.signCount ? record.signCount : 0) + 1;
+
+      update(ref(db, `patrol_records/${id}`), { 
+        signature: signString,
+        signCount: nextCount
+      });
+    };
 
     window.updateRecordField = (id, field, value) => {
       let valToSave = value;
@@ -611,28 +862,16 @@
 
     function saveNewOrder() {
       const rows = document.querySelectorAll('#recordsTableBody tr');
+      const updates = {};
       rows.forEach((row, idx) => {
         const id = row.dataset.id;
         if (id) {
-          update(ref(db, `patrol_records/${id}`), { order: idx });
+          updates[`patrol_records/${id}/order`] = idx;
+          updates[`patrol_records/${id}/code`] = idx + 1;
         }
       });
+      update(ref(db), updates);
     }
-
-    window.signRecord = (id) => {
-      if (!window.currentUser) return;
-      const signerName = window.currentUser.displayName || window.currentUser.email.split('@')[0];
-      const timeStr = new Date().toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
-      const signString = `${signerName} (${timeStr})`;
-
-      update(ref(db, `patrol_records/${id}`), { signature: signString });
-    };
-
-    window.deleteRecord = (id) => {
-      if (confirm('確定要刪除這筆巡廠紀錄嗎？此動作無法復原。')) {
-        remove(ref(db, `patrol_records/${id}`));
-      }
-    };
 
     window.switchMainView = (view) => {
       const tableView = document.getElementById('tableViewSection');
@@ -659,14 +898,12 @@
       const allData = window.recordsData;
       const signedRecords = allData.filter(d => d.signature && d.signature.trim() !== '');
 
-      // KPIs
       document.getElementById('statTotal').textContent = signedRecords.length;
       
       const signedCount = signedRecords.length;
       const rate = allData.length > 0 ? Math.round((signedCount / allData.length) * 100) : 0;
       document.getElementById('statSignRate').textContent = `${rate}%`;
 
-      // Reason Counts (僅限有簽名者)
       const reasonMap = {};
       signedRecords.forEach(d => {
         const r = d.reason || '其他';
@@ -683,7 +920,6 @@
       });
       document.getElementById('statTopReason').textContent = topReason;
 
-      // Render Reason Pie Chart
       const reasonCtx = document.getElementById('reasonChart').getContext('2d');
       if (window.reasonChartObj) window.reasonChartObj.destroy();
 
@@ -705,7 +941,6 @@
         }
       });
 
-      // Person Bar Chart (僅限有簽名者)
       const personMap = {};
       signedRecords.forEach(d => {
         const p = d.inspector || '未指定';
@@ -746,12 +981,12 @@
 
       const excelRows = window.recordsData.map((item, index) => ({
         "順序": index + 1,
-        "編號": item.code || '',
+        "編號": index + 1,
         "巡廠人員": item.inspector || '',
         "巡廠日期時間": item.dateTime || '',
         "事由": item.reason || '',
         "備註 (異常回報)": item.note || '',
-        "巡檢簽名": item.signature || '未簽名'
+        "巡檢簽名": item.signature ? `${item.signature} (第${item.signCount||1}次)` : '未簽名'
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(excelRows);
@@ -775,14 +1010,16 @@
           if (json.length > 0 && confirm(`準備匯入 ${json.length} 筆資料，將會追加至雲端，是否繼續？`)) {
             json.forEach((row, idx) => {
               const newRef = push(ref(db, 'patrol_records'));
+              const newIdx = window.recordsData.length + idx;
               set(newRef, {
-                code: row["編號"] || `PR-IMP-${idx+1}`,
-                inspector: row["巡廠人員"] || INSPECTORS[0],
+                code: newIdx + 1,
+                inspector: row["巡廠人員"] || '巡檢人員',
                 dateTime: row["巡廠日期時間"] || '',
                 reason: row["事由"] || '其他',
                 note: row["備註 (異常回報)"] || '',
                 signature: row["巡檢簽名"] === '未簽名' ? '' : (row["巡檢簽名"] || ''),
-                order: window.recordsData.length + idx,
+                signCount: row["巡檢簽名"] && row["巡檢簽名"] !== '未簽名' ? 1 : 0,
+                order: newIdx,
                 createdAt: serverTimestamp()
               });
             });
