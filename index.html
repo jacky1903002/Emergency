@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>緊急事故巡廠紀錄與分析系統 - 企業版</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (XLSX) CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- html2canvas CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- SortableJS CDN for Drag & Drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cream: {
+                            50: '#FDFBF7',
+                            100: '#F8F5EE',
+                            200: '#EFEAE1',
+                            300: '#E2DACB',
+                        },
+                        brand: {
+                            amber: '#D97706',
+                            slate: '#1E293B',
+                            emerald: '#059669',
+                            rose: '#E11D48',
+                            indigo: '#4F46E5',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', system-ui, sans-serif;
+            background-color: #F8F5EE;
+            color: #111827;
+        }
+        /* Canvas 手寫簽名畫布 */
+        #signatureCanvas {
+            touch-action: none;
+            background-color: #FFFFFF;
+            border: 2px dashed #CBD5E1;
+            border-radius: 0.5rem;
+            cursor: crosshair;
+        }
+        /* Drag handle Cursor */
+        .drag-handle {
+            cursor: grab;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        /* Sortable Ghost Row */
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #FEF3C7 !important;
+        }
+        /* 自訂滾動條 */
+        ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #EFEAE1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-white">
+
+    <!-- 訊息提示 (Toast Notification) -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-x-full transition-transform duration-300 ease-in-out max-w-md bg-white border-l-4 border-amber-500 text-slate-900 p-4 rounded-xl shadow-2xl flex items-center gap-3">
+        <i id="toastIcon" class="fas fa-info-circle text-amber-600 text-xl"></i>
+        <div>
+            <h4 id="toastTitle" class="font-bold text-sm text-black">提示</h4>
+            <p id="toastMessage" class="text-xs text-slate-700">訊息內容...</p>
+        </div>
+    </div>
+
+    <!-- 驗證頁面 ( Auth Container ) -->
+    <div id="authSection" class="fixed inset-0 z-40 bg-cream-100/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="relative w-full max-w-md bg-white border border-cream-300 p-8 rounded-2xl shadow-2xl">
+            <!-- 標頭 Header -->
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 mb-3 border border-amber-500/20 shadow-sm">
+                    <i class="fas fa-shield-triangle-exclamation text-3xl"></i>
+                </div>
+                <h1 class="text-2xl font-extrabold text-black tracking-tight">巡廠安全管理系統</h1>
+                <p class="text-xs text-slate-600 mt-1 font-medium">企業級緊急事故巡廠紀錄與雲端統計平臺</p>
+            </div>
+
+            <!-- 切換頁籤 (Tab) -->
+            <div class="flex bg-cream-100 p-1 rounded-xl mb-6 border border-cream-200">
+                <button id="tabLoginBtn" onclick="switchAuthMode('login')" class="flex-1 py-2 text-sm font-bold rounded-lg text-black bg-white shadow-sm transition-all">登入帳號</button>
+                <button id="tabRegisterBtn" onclick="switchAuthMode('register')" class="flex-1 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:text-black transition-all">註冊帳號</button>
+            </div>
+
+            <!-- 表單區 Form -->
+            <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                <div id="realNameGroup" class="hidden">
+                    <label class="block text-xs font-bold text-black uppercase mb-1">真實姓名 <span class="text-rose-600">*</span></label>
+                    <div class="relative">
+                        <i class="fas fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="authRealName" placeholder="請輸入真實姓名" class="w-full bg-cream-50 border border-slate-300 rounded-lg pl-10 pr-4 py-2.5 text-sm text-black focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-medium">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-black uppercase mb-1">電子郵件 (Email) <span class="text-rose-600">*</span></label>
+                    <div class="relative">
+                        <i class="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="email" id="authEmail" required placeholder="user@company.com" class="w-full bg-cream-50 border border-slate-300 rounded-lg pl-10 pr-4 py-2.5 text-sm text-black focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-medium">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-black uppercase mb-1">密碼 (Password) <span class="text-rose-600">*</span></label>
+                    <div class="relative">
+                        <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="password" id="authPassword" required minlength="6" placeholder="••••••••" class="w-full bg-cream-50 border border-slate-300 rounded-lg pl-10 pr-4 py-2.5 text-sm text-black focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-medium">
+                    </div>
+                </div>
+
+                <button type="submit" id="authSubmitBtn" class="w-full py-3 bg-black hover:bg-slate-800 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 mt-2">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>登入系統</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 主要應用程式 (Main App Area) -->
+    <div id="mainSection" class="hidden flex-1 flex flex-col min-h-screen bg-cream-50">
+        <!-- 頂部狀態導覽列 Top Bar -->
+        <header class="bg-white border-b border-cream-300 sticky top-0 z-30 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+                
+                <!-- 系統名稱 & 品牌標誌 (新增自訂圖片連結與更換功能) -->
+                <div class="flex items-center gap-3">
+                    <div class="relative group">
+                        <div id="logoContainer" onclick="openLogoModal()" class="w-11 h-11 rounded-xl bg-cream-100 border border-cream-300 flex items-center justify-center overflow-hidden cursor-pointer shadow-sm hover:border-amber-500 transition-all" title="點擊更換企業 Logo">
+                            <img id="headerCompanyLogo" src="https://placehold.co/100x100/F8F5EE/1E293B?text=LOGO" alt="Company Logo" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/100x100/F8F5EE/1E293B?text=LOGO'">
+                        </div>
+                        <span class="absolute -bottom-1 -right-1 bg-amber-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] shadow group-hover:scale-110 transition-all">
+                            <i class="fas fa-camera"></i>
+                        </span>
+                    </div>
+                    
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg font-extrabold text-black tracking-tight leading-tight">緊急事故巡廠紀錄</h1>
+                            <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200 uppercase">Enterprise</span>
+                        </div>
+                        <p class="text-xs text-slate-600 font-medium hidden sm:block">即時連線與備份管理平台</p>
+                    </div>
+                </div>
+
+                <!-- 雲端狀態 & 上次儲存時間 Status Indicators -->
+                <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <!-- 連線狀態 -->
+                    <div id="connectionStatus" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cream-100 border border-cream-300">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" id="statusDot"></span>
+                        <span id="statusText" class="text-black font-semibold">連線檢測中...</span>
+                    </div>
+
+                    <!-- 上次儲存時間 -->
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cream-100 border border-cream-300 text-slate-700">
+                        <i class="fas fa-cloud-arrow-up text-amber-600"></i>
+                        <span>上次同步: <strong id="lastSavedTime" class="text-black font-bold font-mono">尚未同步</strong></span>
+                    </div>
+
+                    <!-- 使用者資訊與登出 -->
+                    <div class="flex items-center gap-3 pl-2 border-l border-cream-300">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs shadow-sm" id="userAvatar">
+                                U
+                            </div>
+                            <span id="currentUserDisplay" class="font-bold text-black">使用者</span>
+                        </div>
+                        <button onclick="handleSignOut()" class="p-2 text-slate-500 hover:text-rose-600 hover:bg-cream-100 rounded-lg transition-all" title="登出系統">
+                            <i class="fas fa-power-off text-base"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分頁導覽 Tab Links -->
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-2 border-t border-cream-200 pt-1">
+                <button id="navRecordsTab" onclick="switchView('records')" class="px-4 py-2 border-b-2 border-amber-600 text-black font-bold text-sm flex items-center gap-2 transition-all">
+                    <i class="fas fa-list-check text-amber-600"></i> 巡廠紀錄表單
+                </button>
+                <button id="navAnalyticsTab" onclick="switchView('analytics')" class="px-4 py-2 border-b-2 border-transparent text-slate-600 hover:text-black font-semibold text-sm flex items-center gap-2 transition-all">
+                    <i class="fas fa-chart-pie text-slate-400"></i> 數據統計圖表
+                </button>
+            </div>
+        </header>
+
+        <!-- 主要內容區 Main Content Container -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            
+            <!-- View 1: 巡廠紀錄明細 Table View -->
+            <section id="recordsView" class="space-y-6">
+                <!-- 操作工具列 Command Bar -->
+                <div class="bg-white border border-cream-300 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+                    <!-- 左側搜尋 & 狀態篩選 -->
+                    <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                        <div class="relative flex-1 min-w-[200px]">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="searchInput" oninput="renderTable()" placeholder="搜尋人員、事由、備註..." class="w-full bg-cream-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-black font-medium placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white">
+                        </div>
+                        <select id="filterRemark" onchange="renderTable()" class="bg-cream-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-black font-bold focus:outline-none focus:border-amber-500">
+                            <option value="ALL">全部狀態 (正常/異常)</option>
+                            <option value="NORMAL">無異常/正常巡檢</option>
+                            <option value="ABNORMAL">異常回報/急件</option>
+                        </select>
+                    </div>
+
+                    <!-- 右側按鈕群組 Actions -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="openModal()" class="bg-black hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all">
+                            <i class="fas fa-plus text-amber-400"></i> 新增紀錄
+                        </button>
+
+                        <button onclick="exportToExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-all" title="匯出 Excel 檔">
+                            <i class="fas fa-file-excel"></i> 匯出 Excel
+                        </button>
+
+                        <label class="bg-cream-200 hover:bg-cream-300 text-black text-xs font-bold px-3 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all" title="匯入 Excel 或 CSV 檔案">
+                            <i class="fas fa-file-import text-amber-700"></i> 匯入 Excel
+                            <input type="file" id="importExcelFile" accept=".xlsx, .xls, .csv" onchange="importFromExcel(event)" class="hidden">
+                        </label>
+
+                        <button onclick="exportToPNG()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-all" title="將畫面表格區域匯出成 PNG 截圖">
+                            <i class="fas fa-file-image"></i> 匯出 PNG
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 紀錄表格區域 Table Container -->
+                <div id="exportArea" class="bg-white border border-cream-300 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-cream-200 flex items-center justify-between bg-cream-100">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-clipboard-list text-amber-600"></i>
+                            <h3 class="font-extrabold text-black text-sm">工作表1：緊急事故巡廠紀錄</h3>
+                            <span class="text-[11px] bg-white text-slate-600 px-2 py-0.5 rounded border border-cream-300 font-semibold hidden sm:inline"><i class="fas fa-grip-vertical text-amber-500 mr-1"></i>支援拖曳排序</span>
+                        </div>
+                        <span id="recordCount" class="text-xs font-bold text-black">共 0 筆紀錄</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-cream-200 text-black border-b border-cream-300 font-bold uppercase tracking-wider">
+                                    <th class="p-3.5 w-10 text-center"></th>
+                                    <th class="p-3.5 w-14 text-center">編號</th>
+                                    <th class="p-3.5 w-32">巡廠人員</th>
+                                    <th class="p-3.5 w-40">巡廠日期時間</th>
+                                    <th class="p-3.5">事由</th>
+                                    <th class="p-3.5 w-48">備註 (異常回報)</th>
+                                    <th class="p-3.5 w-44 text-center">巡檢簽名</th>
+                                    <th class="p-3.5 w-24 text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsTableBody" class="divide-y divide-cream-200 text-slate-800">
+                                <tr>
+                                    <td colspan="8" class="text-center py-12 text-slate-500 font-medium">
+                                        <i class="fas fa-spinner fa-spin text-2xl mb-2 text-amber-600 block"></i>
+                                        載入資料中，請稍候...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View 2: 數據統計圖表 Analytics View -->
+            <section id="analyticsView" class="hidden space-y-6">
+                <!-- KPI 摘要卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white border border-cream-300 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-slate-600 uppercase">總巡檢紀錄數</p>
+                            <h3 id="kpiTotal" class="text-2xl font-extrabold text-black mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-amber-500/10 rounded-xl border border-amber-500/20 flex items-center justify-center text-amber-600 text-xl">
+                            <i class="fas fa-clipboard-check"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-cream-300 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-slate-600 uppercase">無異常狀態數</p>
+                            <h3 id="kpiNormal" class="text-2xl font-extrabold text-emerald-600 mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-emerald-500/10 rounded-xl border border-emerald-500/20 flex items-center justify-center text-emerald-600 text-xl">
+                            <i class="fas fa-circle-check"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-cream-300 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-slate-600 uppercase">異常/急件通報數</p>
+                            <h3 id="kpiAbnormal" class="text-2xl font-extrabold text-rose-600 mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-rose-500/10 rounded-xl border border-rose-500/20 flex items-center justify-center text-rose-600 text-xl">
+                            <i class="fas fa-triangle-exclamation"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-cream-300 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-slate-600 uppercase">參與巡檢人員數</p>
+                            <h3 id="kpiStaffCount" class="text-2xl font-extrabold text-indigo-600 mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-indigo-500/10 rounded-xl border border-indigo-500/20 flex items-center justify-center text-indigo-600 text-xl">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 圖表區 Chart Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 圖表 1: 人員巡檢次數統計 (Bar Chart) -->
+                    <div class="bg-white border border-cream-300 rounded-2xl p-5 shadow-sm">
+                        <h4 class="text-sm font-extrabold text-black mb-4 flex items-center gap-2">
+                            <i class="fas fa-chart-bar text-amber-600"></i> 人員巡檢總次數統計
+                        </h4>
+                        <div class="relative h-72">
+                            <canvas id="staffChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 圖表 2: 異常狀態比率統計 (Doughnut Chart) -->
+                    <div class="bg-white border border-cream-300 rounded-2xl p-5 shadow-sm">
+                        <h4 class="text-sm font-extrabold text-black mb-4 flex items-center gap-2">
+                            <i class="fas fa-chart-pie text-emerald-600"></i> 巡檢異常狀況比例
+                        </h4>
+                        <div class="relative h-72">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 自訂企業 Logo Modal -->
+    <div id="logoModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white border border-cream-300 w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-cream-200 pb-3">
+                <h3 class="font-bold text-base text-black flex items-center gap-2">
+                    <i class="fas fa-image text-amber-600"></i> 更換企業品牌標誌 Logo
+                </h3>
+                <button onclick="closeLogoModal()" class="text-slate-400 hover:text-black">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block font-bold text-black mb-1">選項 A：上傳本地圖片檔案</label>
+                    <input type="file" id="logoFileInput" accept="image/*" onchange="handleLogoFileSelect(event)" class="w-full bg-cream-50 border border-slate-300 rounded-lg p-2 text-black">
+                </div>
+
+                <div class="text-center font-bold text-slate-400">- 或 -</div>
+
+                <div>
+                    <label class="block font-bold text-black mb-1">選項 B：輸入圖片網址 (URL)</label>
+                    <input type="url" id="logoUrlInput" placeholder="https://example.com/logo.png" class="w-full bg-cream-50 border border-slate-300 rounded-lg p-2.5 text-black font-medium">
+                </div>
+
+                <div class="border-t border-cream-200 pt-3 flex justify-end gap-2">
+                    <button onclick="resetDefaultLogo()" class="px-3 py-2 bg-cream-200 text-black rounded-lg font-bold">重置預設</button>
+                    <button onclick="saveCustomLogo()" class="px-4 py-2 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700">儲存標誌</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增 / 編輯紀錄 Modal -->
+    <div id="recordModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white border border-cream-300 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-cream-200 flex items-center justify-between bg-cream-100">
+                <h3 id="modalTitle" class="font-extrabold text-base text-black">新增緊急事故巡廠紀錄</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-black p-1 rounded-lg">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+
+            <form id="recordForm" onsubmit="saveRecord(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
+                <input type="hidden" id="editRecordId">
+                <input type="hidden" id="signatureData">
+
+                <!-- 巡廠人員 Dropdown -->
+                <div>
+                    <label class="block text-black font-bold mb-1">巡廠人員 <span class="text-rose-600">*</span></label>
+                    <select id="formStaff" required class="w-full bg-cream-50 border border-slate-300 rounded-xl p-2.5 text-black font-bold focus:outline-none focus:border-amber-500">
+                        <option value="">-- 請選擇巡廠人員 --</option>
+                    </select>
+                </div>
+
+                <!-- 巡廠日期時間 YYMMDD & 時間 -->
+                <div>
+                    <label class="block text-black font-bold mb-1">巡廠日期時間 <span class="text-rose-600">*</span></label>
+                    <input type="datetime-local" id="formDateTime" required class="w-full bg-cream-50 border border-slate-300 rounded-xl p-2.5 text-black font-semibold focus:outline-none focus:border-amber-500">
+                </div>
+
+                <!-- 事由 -->
+                <div>
+                    <label class="block text-black font-bold mb-1">事由 <span class="text-rose-600">*</span></label>
+                    <textarea id="formReason" required rows="2" placeholder="請詳細說明巡檢事由或現場狀況..." class="w-full bg-cream-50 border border-slate-300 rounded-xl p-2.5 text-black font-medium focus:outline-none focus:border-amber-500"></textarea>
+                </div>
+
+                <!-- 備註 (異常回報) -->
+                <div>
+                    <label class="block text-black font-bold mb-1">備註 (異常回報)</label>
+                    <input type="text" id="formRemark" placeholder="例：設備無異常 / 備註：管道輕微滲漏急需檢修" class="w-full bg-cream-50 border border-slate-300 rounded-xl p-2.5 text-black font-medium focus:outline-none focus:border-amber-500">
+                    <p class="text-[11px] text-slate-500 mt-1 font-medium">若包含「異常」、「急件」、「故障」等關鍵字，將自動列為異常警報標籤。</p>
+                </div>
+
+                <!-- 巡檢簽名板 Signature Section -->
+                <div class="border-t border-cream-200 pt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-black font-bold">巡檢簽名 (電子簽名 / 手寫簽章)</label>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="quickDigitalSign()" class="text-xs bg-amber-500/10 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-lg hover:bg-amber-500/20 font-bold transition-all">
+                                <i class="fas fa-signature"></i> 一鍵帶入個人簽章
+                            </button>
+                            <button type="button" onclick="clearSignatureCanvas()" class="text-xs bg-cream-200 text-black px-2 py-1 rounded-lg hover:bg-cream-300 font-bold transition-all">
+                                清除畫布
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Canvas 觸控手寫簽名 -->
+                    <div class="relative">
+                        <canvas id="signatureCanvas" width="500" height="140" class="w-full h-36 border rounded-xl"></canvas>
+                        <p class="text-[10px] text-slate-400 absolute bottom-2 right-2 pointer-events-none">於畫布手寫簽名或點擊上方一鍵簽章</p>
+                    </div>
+                </div>
+
+                <!-- 彈窗操作按鈕 Footer Buttons -->
+                <div class="flex justify-end gap-3 pt-4 border-t border-cream-200">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-cream-200 hover:bg-cream-300 text-black rounded-xl font-bold transition-all">取消</button>
+                    <button type="submit" class="px-5 py-2 bg-black hover:bg-slate-800 text-white font-bold rounded-xl shadow-md transition-all">儲存紀錄</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase JS SDK Imports (v10.8.0) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged, 
+            updateProfile 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { 
+            getDatabase, 
+            ref, 
+            set, 
+            onValue, 
+            push, 
+            remove,
+            update 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // 1. Firebase 金鑰設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyAFnPk1KQfCqx5qfU9GOgK5F3McxHRajS4",
+            authDomain: "emergency-3fc51.firebaseapp.com",
+            projectId: "emergency-3fc51",
+            storageBucket: "emergency-3fc51.firebasestorage.app",
+            messagingSenderId: "399936603939",
+            appId: "1:399936603939:web:77ee360adba9a719c2ae96",
+            measurementId: "G-PGC27JWQT5"
+        };
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        // 全域變數狀態 Global State
+        window.db = db;
+        window.auth = auth;
+        window.recordsData = {}; // 即時巡廠資料
+        window.recordsOrder = []; // 排序 Keys 陣列
+        window.currentUser = null;
+        window.authMode = 'login'; 
+
+        // 指定 24 位巡廠人員名單
+        const STAFF_LIST = [
+            "蔡儀誠", "鄭玄曄", "梁寶文", "陳建華", "陳秉鉞", "彭顏偉", 
+            "楊志偉", "林辰翰", "蔡旻哲", "王盈憲", "黃志浩", "李律賢", 
+            "戴群津", "秦若庭", "劉盈春", "劉金勳", "彭俊銘", "簡志洋", 
+            "張益盛", "王書彬", "王振洲", "呂文頡", "陳志銘", "徐柏欽"
+        ];
+
+        // 頁面初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            initStaffOptions();
+            initSignatureCanvas();
+            initSortableTable();
+            loadCustomLogo();
+            monitorConnection();
+        });
+
+        // 下拉選單填充
+        function initStaffOptions() {
+            const selectEl = document.getElementById('formStaff');
+            if(!selectEl) return;
+            selectEl.innerHTML = '<option value="">-- 請選擇巡廠人員 --</option>';
+            STAFF_LIST.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                selectEl.appendChild(opt);
+            });
+        }
+
+        // Auth 狀態監聽
+        onAuthStateChanged(auth, (user) => {
+            const authSection = document.getElementById('authSection');
+            const mainSection = document.getElementById('mainSection');
+            
+            if (user) {
+                window.currentUser = user;
+                authSection.classList.add('hidden');
+                mainSection.classList.remove('hidden');
+
+                const displayName = user.displayName || user.email.split('@')[0];
+                document.getElementById('currentUserDisplay').textContent = displayName;
+                document.getElementById('userAvatar').textContent = displayName.charAt(0).toUpperCase();
+
+                showToast('歡迎回來', `已成功登入為 ${displayName}`, 'success');
+                listenToRecords();
+            } else {
+                window.currentUser = null;
+                authSection.classList.remove('hidden');
+                mainSection.classList.add('hidden');
+            }
+        });
+
+        window.switchAuthMode = function(mode) {
+            window.authMode = mode;
+            const tabLoginBtn = document.getElementById('tabLoginBtn');
+            const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+            const realNameGroup = document.getElementById('realNameGroup');
+            const authSubmitBtn = document.getElementById('authSubmitBtn');
+
+            if(mode === 'login') {
+                tabLoginBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg text-black bg-white shadow-sm transition-all";
+                tabRegisterBtn.className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:text-black transition-all";
+                realNameGroup.classList.add('hidden');
+                authSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>登入系統</span>';
+            } else {
+                tabRegisterBtn.className = "flex-1 py-2 text-sm font-bold rounded-lg text-black bg-white shadow-sm transition-all";
+                tabLoginBtn.className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:text-black transition-all";
+                realNameGroup.classList.remove('hidden');
+                authSubmitBtn.innerHTML = '<i class="fas fa-user-plus"></i><span>註冊帳號</span>';
+            }
+        };
+
+        window.handleAuthSubmit = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            const realName = document.getElementById('authRealName').value.trim();
+
+            if(!email || !password) return;
+
+            try {
+                if(window.authMode === 'register') {
+                    if(!realName) {
+                        showToast('請填寫完整', '註冊時必須填寫真實姓名', 'warning');
+                        return;
+                    }
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    await updateProfile(userCredential.user, { displayName: realName });
+                    showToast('註冊成功', '帳號已成功建立！', 'success');
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                let msg = error.message;
+                if(error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                    msg = '電子郵件或密碼錯誤';
+                }
+                showToast('驗證失敗', msg, 'error');
+            }
+        };
+
+        window.handleSignOut = function() {
+            signOut(auth).then(() => {
+                showToast('已登出', '您已安全登出系統', 'info');
+            });
+        };
+
+        function monitorConnection() {
+            const connectedRef = ref(db, ".info/connected");
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            onValue(connectedRef, (snap) => {
+                const isConnected = snap.val() === true && navigator.onLine;
+                if (isConnected) {
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse";
+                    statusText.textContent = "雲端連線中 (線上)";
+                    statusText.className = "text-emerald-700 font-bold";
+                } else {
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse";
+                    statusText.textContent = "連線中斷 / 離線";
+                    statusText.className = "text-rose-700 font-bold";
+                }
+            });
+        }
+
+        function listenToRecords() {
+            const recordsRef = ref(db, 'patrol_records');
+            onValue(recordsRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                window.recordsData = data;
+
+                const nowStr = new Date().toLocaleString('zh-TW', { hour12: false });
+                document.getElementById('lastSavedTime').textContent = nowStr;
+
+                renderTable();
+                if(!document.getElementById('analyticsView').classList.contains('hidden')) {
+                    renderCharts();
+                }
+            });
+        }
+
+        window.FirebaseSdk = {
+            ref, push, update, remove
+        };
+    </script>
+
+    <!-- 頁面 logic, Drag&Drop, Logo Upload & Analytics -->
+    <script>
+        let staffChartInstance = null;
+        let statusChartInstance = null;
+        let tempLogoData = null;
+
+        function showToast(title, message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+
+            if(type === 'success') {
+                toast.className = "fixed top-5 right-5 z-50 transform border-l-4 border-emerald-600 bg-white text-black p-4 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300";
+                toastIcon.className = "fas fa-circle-check text-emerald-600 text-xl";
+            } else if(type === 'error') {
+                toast.className = "fixed top-5 right-5 z-50 transform border-l-4 border-rose-600 bg-white text-black p-4 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300";
+                toastIcon.className = "fas fa-circle-exclamation text-rose-600 text-xl";
+            } else if(type === 'warning') {
+                toast.className = "fixed top-5 right-5 z-50 transform border-l-4 border-amber-500 bg-white text-black p-4 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300";
+                toastIcon.className = "fas fa-triangle-exclamation text-amber-500 text-xl";
+            } else {
+                toast.className = "fixed top-5 right-5 z-50 transform border-l-4 border-amber-600 bg-white text-black p-4 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300";
+                toastIcon.className = "fas fa-info-circle text-amber-600 text-xl";
+            }
+
+            toast.classList.remove('translate-x-full');
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+            }, 3500);
+        }
+
+        // Switch View
+        function switchView(viewName) {
+            const recordsView = document.getElementById('recordsView');
+            const analyticsView = document.getElementById('analyticsView');
+            const navRecordsTab = document.getElementById('navRecordsTab');
+            const navAnalyticsTab = document.getElementById('navAnalyticsTab');
+
+            if(viewName === 'records') {
+                recordsView.classList.remove('hidden');
+                analyticsView.classList.add('hidden');
+                navRecordsTab.className = "px-4 py-2 border-b-2 border-amber-600 text-black font-bold text-sm flex items-center gap-2 transition-all";
+                navAnalyticsTab.className = "px-4 py-2 border-b-2 border-transparent text-slate-600 hover:text-black font-semibold text-sm flex items-center gap-2 transition-all";
+            } else {
+                analyticsView.classList.remove('hidden');
+                recordsView.classList.add('hidden');
+                navAnalyticsTab.className = "px-4 py-2 border-b-2 border-amber-600 text-black font-bold text-sm flex items-center gap-2 transition-all";
+                navRecordsTab.className = "px-4 py-2 border-b-2 border-transparent text-slate-600 hover:text-black font-semibold text-sm flex items-center gap-2 transition-all";
+                renderCharts();
+            }
+        }
+
+        // 渲染表格 (拖曳 & 固定 6 核心欄位)
+        function renderTable() {
+            const tbody = document.getElementById('recordsTableBody');
+            const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+            const filterVal = document.getElementById('filterRemark').value;
+            const records = window.recordsData || {};
+
+            let list = Object.keys(records).map((key, index) => ({
+                id: key,
+                ...records[key]
+            }));
+
+            // 預設依時間排序
+            list.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+
+            // 搜尋與篩選
+            list = list.filter(item => {
+                const abnormal = isRemarkAbnormal(item.remark);
+                if(filterVal === 'NORMAL' && abnormal) return false;
+                if(filterVal === 'ABNORMAL' && !abnormal) return false;
+
+                if(searchVal) {
+                    const str = `${item.staff} ${item.reason} ${item.remark} ${item.dateTime}`.toLowerCase();
+                    return str.includes(searchVal);
+                }
+                return true;
+            });
+
+            document.getElementById('recordCount').textContent = `共 ${list.length} 筆紀錄`;
+
+            if(list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-12 text-slate-500 font-medium">
+                            <i class="fas fa-folder-open text-3xl mb-2 text-slate-300 block"></i>
+                            目前尚無巡廠紀錄資料
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = list.map((item, idx) => {
+                const abnormal = isRemarkAbnormal(item.remark);
+                const dateDisplay = formatDisplayDate(item.dateTime);
+                
+                return `
+                    <tr data-id="${item.id}" class="hover:bg-cream-100/80 transition-colors bg-white">
+                        <td class="p-3.5 text-center text-slate-400 drag-handle">
+                            <i class="fas fa-grip-vertical text-slate-400 hover:text-amber-600"></i>
+                        </td>
+                        <td class="p-3.5 text-center font-mono font-bold text-black">${idx + 1}</td>
+                        <td class="p-3.5 font-bold text-black flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-full bg-cream-300 text-black flex items-center justify-center text-[10px] font-extrabold">
+                                ${item.staff ? item.staff.charAt(0) : '?'}
+                            </div>
+                            ${item.staff || '未指定'}
+                        </td>
+                        <td class="p-3.5 font-mono text-black font-semibold">${dateDisplay}</td>
+                        <td class="p-3.5 font-medium text-black max-w-xs truncate" title="${escapeHtml(item.reason)}">${escapeHtml(item.reason)}</td>
+                        <td class="p-3.5">
+                            ${abnormal ? 
+                                `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                    <i class="fas fa-exclamation-triangle"></i> ${escapeHtml(item.remark || '急件異常')}
+                                 </span>` : 
+                                `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    <i class="fas fa-check"></i> ${escapeHtml(item.remark || '正常無異常')}
+                                 </span>`
+                            }
+                        </td>
+                        <td class="p-3.5 text-center">
+                            ${item.signature ? 
+                                `<img src="${item.signature}" alt="簽名" class="h-8 max-w-[120px] object-contain mx-auto border border-cream-300 bg-white rounded px-1">` : 
+                                `<span class="text-slate-400 text-[11px] font-medium">未簽名</span>`
+                            }
+                        </td>
+                        <td class="p-3.5 text-center space-x-1">
+                            <button onclick="editRecord('${item.id}')" class="p-1.5 text-amber-700 hover:bg-cream-200 rounded-lg transition-all" title="編輯">
+                                <i class="fas fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="deleteRecord('${item.id}')" class="p-1.5 text-rose-700 hover:bg-cream-200 rounded-lg transition-all" title="刪除">
+                                <i class="fas fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 初始化 SortableJS 拖曳排序
+        function initSortableTable() {
+            const tbody = document.getElementById('recordsTableBody');
+            if(!tbody) return;
+
+            new Sortable(tbody, {
+                handle: '.drag-handle',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: function (evt) {
+                    showToast('順序調整', '表格項目排列順序已於本機重排', 'info');
+                }
+            });
+        }
+
+        function isRemarkAbnormal(remark) {
+            if(!remark) return false;
+            const kw = ['異常', '急件', '故障', '損壞', '滲漏', '危險', '警告', '不符', '損毀'];
+            return kw.some(k => remark.includes(k));
+        }
+
+        function formatDisplayDate(dtStr) {
+            if(!dtStr) return '-';
+            const d = new Date(dtStr);
+            if(isNaN(d.getTime())) return dtStr;
+            const yy = String(d.getFullYear()).slice(-2);
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${yy}/${mm}/${dd} ${hh}:${min}`;
+        }
+
+        function escapeHtml(str) {
+            if(!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+
+        // --- Custom Logo Settings Modal Logic ---
+        function openLogoModal() {
+            document.getElementById('logoModal').classList.remove('hidden');
+        }
+
+        function closeLogoModal() {
+            document.getElementById('logoModal').classList.add('hidden');
+        }
+
+        function handleLogoFileSelect(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                tempLogoData = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function saveCustomLogo() {
+            const urlInput = document.getElementById('logoUrlInput').value.trim();
+            let finalLogo = tempLogoData || urlInput;
+
+            if(!finalLogo) {
+                showToast('請選擇圖片', '請上傳本地圖檔或輸入有效的圖片連結', 'warning');
+                return;
+            }
+
+            localStorage.setItem('customCompanyLogo', finalLogo);
+            document.getElementById('headerCompanyLogo').src = finalLogo;
+            closeLogoModal();
+            showToast('更新成功', '企業品牌標誌 Logo 已更換', 'success');
+        }
+
+        function resetDefaultLogo() {
+            localStorage.removeItem('customCompanyLogo');
+            tempLogoData = null;
+            document.getElementById('logoUrlInput').value = '';
+            document.getElementById('headerCompanyLogo').src = 'https://placehold.co/100x100/F8F5EE/1E293B?text=LOGO';
+            closeLogoModal();
+            showToast('已重置', '已恢復為系統預設 Logo', 'info');
+        }
+
+        function loadCustomLogo() {
+            const savedLogo = localStorage.getItem('customCompanyLogo');
+            if(savedLogo) {
+                document.getElementById('headerCompanyLogo').src = savedLogo;
+            }
+        }
+
+        // --- Signature Canvas Logic ---
+        let canvas, ctx, isDrawing = false;
+
+        function initSignatureCanvas() {
+            canvas = document.getElementById('signatureCanvas');
+            if(!canvas) return;
+            ctx = canvas.getContext('2d');
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000000'; 
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                ctx.beginPath();
+                ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                isDrawing = true;
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!isDrawing) return;
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                ctx.stroke();
+            });
+
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+        }
+
+        function stopDrawing() {
+            if (isDrawing) {
+                isDrawing = false;
+                ctx.closePath();
+                document.getElementById('signatureData').value = canvas.toDataURL();
+            }
+        }
+
+        function clearSignatureCanvas() {
+            if(!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('signatureData').value = '';
+        }
+
+        function quickDigitalSign() {
+            if (!window.currentUser) {
+                showToast('請先登入', '請登入帳號後再進行簽章', 'warning');
+                return;
+            }
+
+            clearSignatureCanvas();
+            const name = window.currentUser.displayName || window.currentUser.email.split('@')[0];
+            const dateStr = new Date().toLocaleDateString('zh-TW');
+
+            ctx.fillStyle = "#111827";
+            ctx.font = "bold 16px sans-serif";
+            ctx.fillText(`【巡檢核章: ${name}】`, 30, 55);
+            ctx.font = "12px monospace";
+            ctx.fillStyle = "#64748B";
+            ctx.fillText(`時間: ${dateStr}`, 35, 85);
+
+            document.getElementById('signatureData').value = canvas.toDataURL();
+            showToast('印章生成', `已成功自動帶入 [${name}] 電子簽章`, 'success');
+        }
+
+        function openModal() {
+            document.getElementById('editRecordId').value = '';
+            document.getElementById('recordForm').reset();
+            document.getElementById('modalTitle').textContent = '新增緊急事故巡廠紀錄';
+            
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('formDateTime').value = now.toISOString().slice(0, 16);
+
+            clearSignatureCanvas();
+            document.getElementById('recordModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('recordModal').classList.add('hidden');
+        }
+
+        function editRecord(id) {
+            const item = window.recordsData[id];
+            if(!item) return;
+
+            document.getElementById('editRecordId').value = id;
+            document.getElementById('formStaff').value = item.staff || '';
+            document.getElementById('formDateTime').value = item.dateTime || '';
+            document.getElementById('formReason').value = item.reason || '';
+            document.getElementById('formRemark').value = item.remark || '';
+            document.getElementById('modalTitle').textContent = '編輯巡廠紀錄';
+
+            clearSignatureCanvas();
+            if(item.signature) {
+                document.getElementById('signatureData').value = item.signature;
+                const img = new Image();
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = item.signature;
+            }
+
+            document.getElementById('recordModal').classList.remove('hidden');
+        }
+
+        async function saveRecord(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editRecordId').value;
+            const staff = document.getElementById('formStaff').value;
+            const dateTime = document.getElementById('formDateTime').value;
+            const reason = document.getElementById('formReason').value.trim();
+            const remark = document.getElementById('formRemark').value.trim();
+            const signature = document.getElementById('signatureData').value;
+
+            if(!staff || !dateTime || !reason) {
+                showToast('請填寫完整', '請選擇巡廠人員、時間與填寫事由', 'warning');
+                return;
+            }
+
+            const payload = {
+                staff,
+                dateTime,
+                reason,
+                remark,
+                signature: signature || '',
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                if(editId) {
+                    const recordRef = window.FirebaseSdk.ref(window.db, `patrol_records/${editId}`);
+                    await window.FirebaseSdk.update(recordRef, payload);
+                    showToast('更新成功', '巡廠紀錄已即時儲存至雲端', 'success');
+                } else {
+                    const listRef = window.FirebaseSdk.ref(window.db, 'patrol_records');
+                    await window.FirebaseSdk.push(listRef, payload);
+                    showToast('新增成功', '巡廠紀錄已即時上傳至雲端', 'success');
+                }
+                closeModal();
+            } catch (err) {
+                console.error("Save error:", err);
+                showToast('儲存失敗', err.message, 'error');
+            }
+        }
+
+        async function deleteRecord(id) {
+            if(!confirm("確定要刪除這筆巡廠紀錄嗎？此動作將同步於雲端資料庫。")) return;
+            try {
+                const recordRef = window.FirebaseSdk.ref(window.db, `patrol_records/${id}`);
+                await window.FirebaseSdk.remove(recordRef);
+                showToast('已刪除', '紀錄已成功移除', 'info');
+            } catch (err) {
+                showToast('刪除失敗', err.message, 'error');
+            }
+        }
+
+        // Export to Excel
+        function exportToExcel() {
+            const records = window.recordsData || {};
+            const keys = Object.keys(records);
+
+            if(keys.length === 0) {
+                showToast('無法匯出', '目前沒有可匯出的巡廠紀錄', 'warning');
+                return;
+            }
+
+            const excelRows = keys.map((key, index) => {
+                const r = records[key];
+                return {
+                    "編號": index + 1,
+                    "巡廠人員": r.staff || '',
+                    "巡廠日期時間": formatDisplayDate(r.dateTime),
+                    "事由": r.reason || '',
+                    "備註(異常回報)": r.remark || '',
+                    "簽名狀態": r.signature ? "已完成簽名" : "未簽名"
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(excelRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "緊急事故巡廠紀錄");
+
+            const dateStr = new Date().toISOString().slice(0,10);
+            XLSX.writeFile(workbook, `巡廠紀錄表_${dateStr}.xlsx`);
+            showToast('匯出成功', '已產生 Excel 試算表檔', 'success');
+        }
+
+        // Import Excel
+        function importFromExcel(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonRows = XLSX.utils.sheet_to_json(worksheet);
+
+                    if(jsonRows.length === 0) {
+                        showToast('匯入無效', '檔案內容為空', 'warning');
+                        return;
+                    }
+
+                    let importCount = 0;
+                    const listRef = window.FirebaseSdk.ref(window.db, 'patrol_records');
+
+                    for(let row of jsonRows) {
+                        const staff = row["巡廠人員"] || row["巡檢人員"] || "未指定";
+                        const dateTime = row["巡廠日期時間"] || new Date().toISOString().slice(0, 16);
+                        const reason = row["事由"] || row["事故內容"] || "無詳細說明";
+                        const remark = row["備註(異常回報)"] || row["備註"] || "正常";
+
+                        await window.FirebaseSdk.push(listRef, {
+                            staff,
+                            dateTime,
+                            reason,
+                            remark,
+                            signature: '',
+                            importedAt: new Date().toISOString()
+                        });
+                        importCount++;
+                    }
+
+                    showToast('匯入完成', `已成功批量匯入 ${importCount} 筆巡廠紀錄`, 'success');
+                    document.getElementById('importExcelFile').value = '';
+                } catch (err) {
+                    console.error("Import error:", err);
+                    showToast('匯入失敗', '格式解析錯誤，請確認 Excel 欄位正確', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Export PNG
+        function exportToPNG() {
+            const targetEl = document.getElementById('exportArea');
+            if(!targetEl) return;
+
+            showToast('處理中', '正在產生高畫質 PNG 截圖...', 'info');
+
+            html2canvas(targetEl, {
+                backgroundColor: '#F8F5EE',
+                scale: 2
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `巡廠紀錄報表_${new Date().getTime()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showToast('匯出成功', '已成功下載 PNG 圖片', 'success');
+            }).catch(err => {
+                console.error("PNG capture error:", err);
+                showToast('截圖失敗', err.message, 'error');
+            });
+        }
+
+        // Analytics Analytics Page Charts
+        function renderCharts() {
+            const records = window.recordsData || {};
+            const list = Object.values(records);
+
+            const total = list.length;
+            let normalCount = 0;
+            let abnormalCount = 0;
+            const staffMap = {};
+
+            list.forEach(item => {
+                if(isRemarkAbnormal(item.remark)) {
+                    abnormalCount++;
+                } else {
+                    normalCount++;
+                }
+
+                const s = item.staff || '未指定';
+                staffMap[s] = (staffMap[s] || 0) + 1;
+            });
+
+            document.getElementById('kpiTotal').textContent = total;
+            document.getElementById('kpiNormal').textContent = normalCount;
+            document.getElementById('kpiAbnormal').textContent = abnormalCount;
+            document.getElementById('kpiStaffCount').textContent = Object.keys(staffMap).length;
+
+            const staffLabels = Object.keys(staffMap);
+            const staffCounts = Object.values(staffMap);
+
+            const ctxStaff = document.getElementById('staffChart').getContext('2d');
+            if(staffChartInstance) staffChartInstance.destroy();
+
+            staffChartInstance = new Chart(ctxStaff, {
+                type: 'bar',
+                data: {
+                    labels: staffLabels.length ? staffLabels : ['無資料'],
+                    datasets: [{
+                        label: '巡檢次數',
+                        data: staffCounts.length ? staffCounts : [0],
+                        backgroundColor: '#D97706',
+                        borderColor: '#B45309',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#111827', font: { weight: 'bold' } }, grid: { display: false } },
+                        y: { ticks: { color: '#111827', precision: 0 }, grid: { color: '#E2DACB' } }
+                    }
+                }
+            });
+
+            const ctxStatus = document.getElementById('statusChart').getContext('2d');
+            if(statusChartInstance) statusChartInstance.destroy();
+
+            statusChartInstance = new Chart(ctxStatus, {
+                type: 'doughnut',
+                data: {
+                    labels: ['無異常/正常', '異常/急件通報'],
+                    datasets: [{
+                        data: [normalCount, abnormalCount],
+                        backgroundColor: ['#059669', '#E11D48'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#111827', font: { size: 12, weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
