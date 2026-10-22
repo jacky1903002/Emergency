@@ -86,8 +86,8 @@
       </div>
 
       <!-- Error Message -->
-      <div id="authError" class="hidden mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2">
-        <i class="fa-solid fa-circle-exclamation"></i>
+      <div id="authError" class="hidden mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-start gap-2">
+        <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
         <span id="authErrorText"></span>
       </div>
 
@@ -234,7 +234,7 @@
         <div id="emptyState" class="hidden py-16 text-center text-gray-400">
           <i class="fa-solid fa-clipboard-list text-5xl mb-3 text-cream-300"></i>
           <p class="text-base font-semibold">目前尚無巡廠紀錄</p>
-          <p class="text-xs text-gray-400 mt-1">可透過匯入 Excel 批次新增資料</p>
+          <p class="text-xs text-gray-400 mt-1">請透過 Excel 匯入或聯絡管理員建立初始資料列</p>
         </div>
       </div>
     </div>
@@ -430,11 +430,11 @@
         window.location.reload();
       } catch (err) {
         errBox.classList.remove('hidden');
-        document.getElementById('authErrorText').textContent = err.message;
+        document.getElementById('authErrorText').textContent = `註冊失敗 (${err.code}): ${err.message}`;
       }
     };
 
-    // User Login
+    // User Login (Enhanced with detailed error output)
     window.handleLogin = async (e) => {
       e.preventDefault();
       const email = document.getElementById('loginEmail').value.trim();
@@ -445,7 +445,7 @@
         await signInWithEmailAndPassword(auth, email, pwd);
       } catch (err) {
         errBox.classList.remove('hidden');
-        document.getElementById('authErrorText').textContent = "登入失敗：請檢查帳號密碼";
+        document.getElementById('authErrorText').textContent = `登入失敗 (${err.code})：請確認 Firebase 是否已啟用 Email 登入或帳密是否正確。`;
       }
     };
 
@@ -511,7 +511,6 @@
       const tbody = document.getElementById('recordsTableBody');
       const emptyState = document.getElementById('emptyState');
       
-      // Preserve focused input element ID to prevent losing focus on re-render
       const activeElId = document.activeElement ? document.activeElement.id : null;
       
       tbody.innerHTML = '';
@@ -547,4 +546,319 @@
 
         // Reason Options HTML
         const reasonSelectHtml = REASON_OPTIONS.map(opt => `
-          <option value="${opt}" ${item.reason === opt
+          <option value="${opt}" ${item.reason === opt ? 'selected' : ''}>${opt}</option>
+        `).join('');
+
+        const pickerValue = parseFormattedDTToPicker(item.dateTime);
+
+        tr.innerHTML = `
+          <td class="py-3.5 px-3 text-center drag-handle text-gray-400 hover:text-amber-700">
+            <i class="fa-solid fa-grip-vertical"></i>
+          </td>
+          <td class="py-3.5 px-4 font-mono font-bold text-gray-900">${escapeHtml(item.code || '')}</td>
+          <td class="py-3.5 px-4 text-gray-900 font-bold select-none">${escapeHtml(item.inspector || '')}</td>
+          <td class="py-2 px-3">
+            <input type="datetime-local" 
+                   id="dt_${item.id}"
+                   value="${pickerValue}" 
+                   onchange="updateRecordField('${item.id}', 'dateTime', this.value)"
+                   class="w-full px-2 py-1.5 text-xs font-mono rounded border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
+          </td>
+          <td class="py-2 px-3">
+            <select onchange="updateRecordField('${item.id}', 'reason', this.value)"
+                    class="w-full px-2 py-1.5 text-xs font-bold rounded border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
+              ${reasonSelectHtml}
+            </select>
+          </td>
+          <td class="py-2 px-3">
+            <input type="text" 
+                   id="note_${item.id}"
+                   value="${escapeHtml(item.note || '')}" 
+                   placeholder="直接在此輸入備註..."
+                   onblur="updateRecordField('${item.id}', 'note', this.value)"
+                   onkeydown="if(event.key==='Enter') this.blur()"
+                   class="w-full px-2.5 py-1.5 text-xs rounded border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
+          </td>
+          <td class="py-3.5 px-4 text-center">${signatureHtml}</td>
+          <td class="py-3.5 px-4 text-center no-export">
+            <button onclick="deleteRecord('${item.id}')" class="p-1.5 rounded-md text-gray-400 hover:text-red-700 hover:bg-red-50 transition" title="刪除">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      if (activeElId) {
+        const el = document.getElementById(activeElId);
+        if (el) el.focus();
+      }
+
+      if (!window.sortableInstance) {
+        window.sortableInstance = new Sortable(tbody, {
+          handle: '.drag-handle',
+          animation: 150,
+          ghostClass: 'sortable-ghost',
+          onEnd: function () {
+            saveNewOrder();
+          }
+        });
+      }
+    }
+
+    // In-line Field Updating
+    window.updateRecordField = (id, field, value) => {
+      let valToSave = value;
+      if (field === 'dateTime') {
+        valToSave = formatPickerToYYMMDD(value);
+      }
+      update(ref(db, `patrol_records/${id}`), {
+        [field]: valToSave
+      });
+    };
+
+    // Save Drag and Drop Order
+    function saveNewOrder() {
+      const rows = document.querySelectorAll('#recordsTableBody tr');
+      rows.forEach((row, idx) => {
+        const id = row.dataset.id;
+        if (id) {
+          update(ref(db, `patrol_records/${id}`), { order: idx });
+        }
+      });
+    }
+
+    // Direct Signature Action
+    window.signRecord = (id) => {
+      if (!window.currentUser) return;
+      const signerName = window.currentUser.displayName || window.currentUser.email.split('@')[0];
+      const timeStr = new Date().toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+      const signString = `${signerName} (${timeStr})`;
+
+      update(ref(db, `patrol_records/${id}`), { signature: signString });
+    };
+
+    // Delete Record
+    window.deleteRecord = (id) => {
+      if (confirm('確定要刪除這筆巡廠紀錄嗎？此動作無法復原。')) {
+        remove(ref(db, `patrol_records/${id}`));
+      }
+    };
+
+    // View Switching
+    window.switchMainView = (view) => {
+      const tableView = document.getElementById('tableViewSection');
+      const chartView = document.getElementById('chartViewSection');
+      const viewTableBtn = document.getElementById('viewTableBtn');
+      const viewChartBtn = document.getElementById('viewChartBtn');
+
+      if (view === 'table') {
+        tableView.classList.remove('hidden');
+        chartView.classList.add('hidden');
+        viewTableBtn.className = "flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white text-gray-900 shadow-sm";
+        viewChartBtn.className = "flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition text-gray-600 hover:text-gray-900";
+      } else {
+        tableView.classList.add('hidden');
+        chartView.classList.remove('hidden');
+        viewChartBtn.className = "flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white text-gray-900 shadow-sm";
+        viewTableBtn.className = "flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition text-gray-600 hover:text-gray-900";
+        renderCharts();
+      }
+    };
+
+    // Analytics Chart.js Rendering
+    function renderCharts() {
+      const data = window.recordsData;
+
+      document.getElementById('statTotal').textContent = data.length;
+      
+      const signedCount = data.filter(d => d.signature && d.signature.trim() !== '').length;
+      const rate = data.length > 0 ? Math.round((signedCount / data.length) * 100) : 0;
+      document.getElementById('statSignRate').textContent = `${rate}%`;
+
+      const reasonMap = {};
+      data.forEach(d => {
+        const r = d.reason || '其他';
+        reasonMap[r] = (reasonMap[r] || 0) + 1;
+      });
+
+      let topReason = '無';
+      let maxCount = 0;
+      Object.entries(reasonMap).forEach(([k, v]) => {
+        if (v > maxCount) {
+          maxCount = v;
+          topReason = k;
+        }
+      });
+      document.getElementById('statTopReason').textContent = topReason;
+
+      const reasonCtx = document.getElementById('reasonChart').getContext('2d');
+      if (window.reasonChartObj) window.reasonChartObj.destroy();
+
+      window.reasonChartObj = new Chart(reasonCtx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(reasonMap),
+          datasets: [{
+            data: Object.values(reasonMap),
+            backgroundColor: ['#2563EB', '#DC2626', '#D97706', '#0D9488', '#6B7280']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+
+      const personMap = {};
+      data.forEach(d => {
+        const p = d.inspector || '未指定';
+        personMap[p] = (personMap[p] || 0) + 1;
+      });
+
+      const personCtx = document.getElementById('personChart').getContext('2d');
+      if (window.personChartObj) window.personChartObj.destroy();
+
+      window.personChartObj = new Chart(personCtx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(personMap),
+          datasets: [{
+            label: '巡查次數',
+            data: Object.values(personMap),
+            backgroundColor: '#B45309'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+          }
+        }
+      });
+    }
+
+    // Export Excel
+    window.exportToExcel = () => {
+      if (window.recordsData.length === 0) {
+        alert('無紀錄可匯出');
+        return;
+      }
+
+      const excelRows = window.recordsData.map((item, index) => ({
+        "順序": index + 1,
+        "編號": item.code || '',
+        "巡廠人員": item.inspector || '',
+        "巡廠日期時間": item.dateTime || '',
+        "事由": item.reason || '',
+        "備註 (異常回報)": item.note || '',
+        "巡檢簽名": item.signature || '未簽名'
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(excelRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "緊急事故巡廠紀錄");
+      XLSX.writeFile(workbook, `巡廠紀錄表_${new Date().toISOString().slice(0,10)}.xlsx`);
+    };
+
+    // Import Excel
+    window.importExcel = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.SheetNames[0];
+          const json = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+
+          if (json.length > 0 && confirm(`準備匯入 ${json.length} 筆資料，將會追加至雲端，是否繼續？`)) {
+            json.forEach((row, idx) => {
+              const newRef = push(ref(db, 'patrol_records'));
+              set(newRef, {
+                code: row["編號"] || `PR-IMP-${idx+1}`,
+                inspector: row["巡廠人員"] || INSPECTORS[0],
+                dateTime: row["巡廠日期時間"] || '',
+                reason: row["事由"] || '其他',
+                note: row["備註 (異常回報)"] || '',
+                signature: row["巡檢簽名"] === '未簽名' ? '' : (row["巡檢簽名"] || ''),
+                order: window.recordsData.length + idx,
+                createdAt: serverTimestamp()
+              });
+            });
+            alert('匯入成功！');
+          }
+        } catch (err) {
+          alert('解析 Excel 檔案失敗，請確保欄位名稱正確。');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    };
+
+    // Export PNG
+    window.exportToPNG = () => {
+      const target = document.getElementById('exportableArea');
+      html2canvas(target, {
+        scale: 2,
+        ignoreElements: (el) => el.classList.contains('no-export')
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `巡廠紀錄畫面_${new Date().toISOString().slice(0,10)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    };
+
+    // Custom Logo Trigger & Local Storage
+    window.triggerLogoUpload = () => {
+      document.getElementById('logoFileInput').click();
+    };
+
+    window.uploadLogo = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const logoData = evt.target.result;
+        localStorage.setItem('custom_patrol_logo', logoData);
+        applyLogo(logoData);
+      };
+      reader.readAsDataURL(file);
+    };
+
+    function applyLogo(src) {
+      const customImg = document.getElementById('customLogo');
+      const defaultIcon = document.getElementById('defaultLogoIcon');
+      if (src) {
+        customImg.src = src;
+        customImg.classList.remove('hidden');
+        defaultIcon.classList.add('hidden');
+      }
+    }
+
+    const savedLogo = localStorage.getItem('custom_patrol_logo');
+    if (savedLogo) {
+      applyLogo(savedLogo);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
