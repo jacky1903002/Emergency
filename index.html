@@ -95,7 +95,7 @@
       <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">電子郵件 Email</label>
-          <input type="email" id="loginEmail" required class="w-[#100%] w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none text-gray-900" placeholder="user@company.com">
+          <input type="email" id="loginEmail" required class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none text-gray-900" placeholder="user@company.com">
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">密碼 Password</label>
@@ -118,7 +118,7 @@
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">設定密碼 Password <span class="text-red-500">*</span></label>
-          <input type="password" id="regPassword" required minlength="6" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none text-gray-900" placeholder="至少6個位元">
+          <input type="password" id="regPassword" required minlength="6" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none text-gray-900" placeholder="至少6個字元">
         </div>
         <button type="submit" class="w-full bg-amber-700 hover:bg-amber-800 text-white font-bold py-3 rounded-lg shadow-md transition duration-200">
           建立帳號並登入 <i class="fa-solid fa-user-plus ml-1"></i>
@@ -196,8 +196,8 @@
 
       <!-- 功能操作按鈕群 -->
       <div class="flex flex-wrap items-center gap-2">
-        <button onclick="openAddModal()" class="bg-amber-700 hover:bg-amber-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm flex items-center gap-2 transition">
-          <i class="fa-solid fa-plus"></i> 新增巡廠紀錄
+        <button onclick="addNewRecordRow()" class="bg-amber-700 hover:bg-amber-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm flex items-center gap-2 transition">
+          <i class="fa-solid fa-plus"></i> 新增巡廠紀錄列
         </button>
         <button onclick="exportToExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm flex items-center gap-2 transition">
           <i class="fa-solid fa-file-excel"></i> 一鍵匯出 Excel
@@ -222,11 +222,11 @@
                 <th class="py-4 px-3 text-center w-12">排序</th>
                 <th class="py-4 px-4 w-28">編號</th>
                 <th class="py-4 px-4 w-36">巡廠人員</th>
-                <th class="py-4 px-4 w-48">巡廠日期時間</th>
-                <th class="py-4 px-4 w-28">事由</th>
+                <th class="py-4 px-4 w-52">巡廠日期時間</th>
+                <th class="py-4 px-4 w-36">事由</th>
                 <th class="py-4 px-4">備註 (異常回報)</th>
                 <th class="py-4 px-4 w-48 text-center">巡檢簽名</th>
-                <th class="py-4 px-4 w-28 text-center no-export">操作</th>
+                <th class="py-4 px-4 w-20 text-center no-export">操作</th>
               </tr>
             </thead>
             <tbody id="recordsTableBody" class="divide-y divide-cream-100 text-sm text-gray-900 font-medium">
@@ -237,7 +237,7 @@
         <div id="emptyState" class="hidden py-16 text-center text-gray-400">
           <i class="fa-solid fa-clipboard-list text-5xl mb-3 text-cream-300"></i>
           <p class="text-base font-semibold">目前尚無巡廠紀錄</p>
-          <p class="text-xs text-gray-400 mt-1">點擊上方「新增巡廠紀錄」按鈕建立第一筆資料</p>
+          <p class="text-xs text-gray-400 mt-1">點擊上方「新增巡廠紀錄列」按鈕建立第一筆資料</p>
         </div>
       </div>
     </div>
@@ -308,60 +308,6 @@
     </div>
   </footer>
 
-  <!-- 新增/編輯巡廠紀錄 Modal -->
-  <div id="recordModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl border border-cream-200 max-w-lg w-full p-6 relative">
-      <div class="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
-        <h3 id="modalTitle" class="text-lg font-bold text-gray-900">新增巡廠紀錄</h3>
-        <button onclick="closeRecordModal()" class="text-gray-400 hover:text-gray-600 p-1">
-          <i class="fa-solid fa-xmark text-xl"></i>
-        </button>
-      </div>
-
-      <form id="recordForm" onsubmit="saveRecord(event)" class="space-y-4">
-        <input type="hidden" id="recordId">
-
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">編號 (Auto/Custom)</label>
-          <input type="text" id="fieldCode" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">巡廠人員 <span class="text-red-500">*</span></label>
-          <select id="fieldInspector" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
-            <!-- 動態注入指定名單 -->
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">巡廠日期時間 (YYMMDD + 時間) <span class="text-red-500">*</span></label>
-          <input type="datetime-local" id="fieldDateTime" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">事由 <span class="text-red-500">*</span></label>
-          <select id="fieldReason" required class="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
-            <option value="天災">天災</option>
-            <option value="人禍">人禍</option>
-            <option value="地震">地震</option>
-            <option value="颱風">颱風</option>
-            <option value="其他">其他</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">備註 (異常回報)</label>
-          <textarea id="fieldNote" rows="3" class="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="可輸入任何文字或數字說明..."></textarea>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-          <button type="button" onclick="closeRecordModal()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-bold hover:bg-gray-50">取消</button>
-          <button type="submit" class="px-5 py-2 rounded-lg bg-amber-700 hover:bg-amber-800 text-white text-sm font-bold shadow-md">儲存紀錄</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -381,7 +327,7 @@
       remove, 
       push, 
       serverTimestamp, 
-      onDisconnect 
+      update
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // Firebase Config
@@ -415,14 +361,7 @@
       "張益盛","王書彬","王振洲","呂文頡","陳志銘","徐柏欽"
     ];
 
-    // Initialize Dropdowns
-    const inspectorSelect = document.getElementById('fieldInspector');
-    INSPECTORS.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      inspectorSelect.appendChild(opt);
-    });
+    const REASON_OPTIONS = ["天災", "人禍", "地震", "颱風", "其他"];
 
     // Monitor Connection Status
     const connectedRef = ref(db, ".info/connected");
@@ -515,7 +454,7 @@
 
     // User Logout
     window.handleLogout = () => {
-      if (confirm('確定要登入系統嗎？')) {
+      if (confirm('確定要登出系統嗎？')) {
         signOut(auth);
       }
     };
@@ -543,10 +482,41 @@
       });
     }
 
-    // Render Table Body
+    // Helper: Convert YYMMDD HH:mm to ISO Datetime Local string (YYYY-MM-THH:mm)
+    function parseFormattedDTToPicker(dtStr) {
+      if (!dtStr || dtStr.length < 11) return '';
+      try {
+        const year = '20' + dtStr.substring(0, 2);
+        const month = dtStr.substring(2, 4);
+        const day = dtStr.substring(4, 6);
+        const time = dtStr.substring(7, 12);
+        return `${year}-${month}-${day}T${time}`;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    // Helper: Convert Date object or ISO string to YYMMDD HH:mm
+    function formatPickerToYYMMDD(isoStr) {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '';
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${yy}${mm}${dd} ${hh}:${min}`;
+    }
+
+    // Render Table Body with In-line Editable Controls
     function renderTable() {
       const tbody = document.getElementById('recordsTableBody');
       const emptyState = document.getElementById('emptyState');
+      
+      // Preserve focused input element ID to prevent losing focus on re-render
+      const activeElId = document.activeElement ? document.activeElement.id : null;
+      
       tbody.innerHTML = '';
 
       if (window.recordsData.length === 0) {
@@ -578,31 +548,56 @@
           `;
         }
 
+        // Reason Options HTML
+        const reasonSelectHtml = REASON_OPTIONS.map(opt => `
+          <option value="${opt}" ${item.reason === opt ? 'selected' : ''}>${opt}</option>
+        `).join('');
+
+        const pickerValue = parseFormattedDTToPicker(item.dateTime);
+
         tr.innerHTML = `
           <td class="py-3.5 px-3 text-center drag-handle text-gray-400 hover:text-amber-700">
             <i class="fa-solid fa-grip-vertical"></i>
           </td>
           <td class="py-3.5 px-4 font-mono font-bold text-gray-900">${escapeHtml(item.code || '')}</td>
           <td class="py-3.5 px-4 text-gray-900 font-bold select-none">${escapeHtml(item.inspector || '')}</td>
-          <td class="py-3.5 px-4 font-mono text-gray-800">${escapeHtml(item.dateTime || '')}</td>
-          <td class="py-3.5 px-4">
-            <span class="px-2.5 py-1 rounded-md text-xs font-bold ${getReasonBadgeClass(item.reason)}">
-              ${escapeHtml(item.reason || '')}
-            </span>
+          <td class="py-2 px-3">
+            <input type="datetime-local" 
+                   id="dt_${item.id}"
+                   value="${pickerValue}" 
+                   onchange="updateRecordField('${item.id}', 'dateTime', this.value)"
+                   class="w-full px-2 py-1.5 text-xs font-mono rounded border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
           </td>
-          <td class="py-3.5 px-4 text-gray-700 whitespace-pre-wrap">${escapeHtml(item.note || '-')}</td>
+          <td class="py-2 px-3">
+            <select onchange="updateRecordField('${item.id}', 'reason', this.value)"
+                    class="w-full px-2 py-1.5 text-xs font-bold rounded border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
+              ${reasonSelectHtml}
+            </select>
+          </td>
+          <td class="py-2 px-3">
+            <input type="text" 
+                   id="note_${item.id}"
+                   value="${escapeHtml(item.note || '')}" 
+                   placeholder="直接在此輸入備註..."
+                   onblur="updateRecordField('${item.id}', 'note', this.value)"
+                   onkeydown="if(event.key==='Enter') this.blur()"
+                   class="w-full px-2.5 py-1.5 text-xs rounded border border-gray-300 focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
+          </td>
           <td class="py-3.5 px-4 text-center">${signatureHtml}</td>
-          <td class="py-3.5 px-4 text-center space-x-1 no-export">
-            <button onclick="openEditModal('${item.id}')" class="p-1.5 rounded-md text-gray-500 hover:text-amber-700 hover:bg-cream-100 transition" title="編輯">
-              <i class="fa-solid fa-pen-to-square"></i>
-            </button>
-            <button onclick="deleteRecord('${item.id}')" class="p-1.5 rounded-md text-gray-500 hover:text-red-700 hover:bg-red-50 transition" title="刪除">
+          <td class="py-3.5 px-4 text-center no-export">
+            <button onclick="deleteRecord('${item.id}')" class="p-1.5 rounded-md text-gray-400 hover:text-red-700 hover:bg-red-50 transition" title="刪除">
               <i class="fa-solid fa-trash-can"></i>
             </button>
           </td>
         `;
         tbody.appendChild(tr);
       });
+
+      // Restore focus if element exists
+      if (activeElId) {
+        const el = document.getElementById(activeElId);
+        if (el) el.focus();
+      }
 
       // Init Drag and Drop SortableJS
       if (!window.sortableInstance) {
@@ -617,16 +612,42 @@
       }
     }
 
-    // Badge styling
-    function getReasonBadgeClass(reason) {
-      switch(reason) {
-        case '天災': return 'bg-blue-100 text-blue-800 border border-blue-200';
-        case '人禍': return 'bg-red-100 text-red-800 border border-red-200';
-        case '地震': return 'bg-amber-100 text-amber-800 border border-amber-200';
-        case '颱風': return 'bg-teal-100 text-teal-800 border border-teal-200';
-        default: return 'bg-gray-100 text-gray-800 border border-gray-200';
+    // In-line Field Updating
+    window.updateRecordField = (id, field, value) => {
+      let valToSave = value;
+      if (field === 'dateTime') {
+        valToSave = formatPickerToYYMMDD(value);
       }
-    }
+      update(ref(db, `patrol_records/${id}`), {
+        [field]: valToSave
+      });
+    };
+
+    // Add New Empty Record Row directly to Table
+    window.addNewRecordRow = () => {
+      const datePrefix = new Date().toISOString().slice(0,10).replace(/-/g,'');
+      const defaultInspector = INSPECTORS[window.recordsData.length % INSPECTORS.length];
+      
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const currentFormattedDT = `${yy}${mm}${dd} ${hh}:${min}`;
+
+      const newRef = push(ref(db, 'patrol_records'));
+      set(newRef, {
+        code: `PR-${datePrefix}-${Math.floor(10 + Math.random() * 90)}`,
+        inspector: defaultInspector,
+        dateTime: currentFormattedDT,
+        reason: '天災',
+        note: '',
+        signature: '',
+        order: window.recordsData.length,
+        createdAt: serverTimestamp()
+      });
+    };
 
     // Save Drag and Drop Order
     function saveNewOrder() {
@@ -634,7 +655,7 @@
       rows.forEach((row, idx) => {
         const id = row.dataset.id;
         if (id) {
-          set(ref(db, `patrol_records/${id}/order`), idx);
+          update(ref(db, `patrol_records/${id}`), { order: idx });
         }
       });
     }
@@ -646,96 +667,7 @@
       const timeStr = new Date().toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
       const signString = `${signerName} (${timeStr})`;
 
-      set(ref(db, `patrol_records/${id}/signature`), signString);
-    };
-
-    // Open Modal
-    window.openAddModal = () => {
-      document.getElementById('modalTitle').textContent = "新增巡廠紀錄";
-      document.getElementById('recordId').value = '';
-      
-      // Auto Code Generation (e.g., PR-20261022-01)
-      const datePrefix = new Date().toISOString().slice(0,10).replace(/-/g,'');
-      document.getElementById('fieldCode').value = `PR-${datePrefix}-${Math.floor(10 + Math.random() * 90)}`;
-      
-      // Default datetime
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      document.getElementById('fieldDateTime').value = now.toISOString().slice(0, 16);
-
-      document.getElementById('fieldReason').value = '天災';
-      document.getElementById('fieldNote').value = '';
-
-      document.getElementById('recordModal').classList.remove('hidden');
-    };
-
-    window.openEditModal = (id) => {
-      const record = window.recordsData.find(r => r.id === id);
-      if (!record) return;
-
-      document.getElementById('modalTitle').textContent = "編輯巡廠紀錄";
-      document.getElementById('recordId').value = record.id;
-      document.getElementById('fieldCode').value = record.code || '';
-      document.getElementById('fieldInspector').value = record.inspector || INSPECTORS[0];
-      document.getElementById('fieldDateTime').value = record.dateTime || '';
-      document.getElementById('fieldReason').value = record.reason || '其他';
-      document.getElementById('fieldNote').value = record.note || '';
-
-      document.getElementById('recordModal').classList.remove('hidden');
-    };
-
-    window.closeRecordModal = () => {
-      document.getElementById('recordModal').classList.add('hidden');
-    };
-
-    // Save Record (Add/Update)
-    window.saveRecord = (e) => {
-      e.preventDefault();
-      const id = document.getElementById('recordId').value;
-      const code = document.getElementById('fieldCode').value.trim();
-      const inspector = document.getElementById('fieldInspector').value;
-      const rawDateTime = document.getElementById('fieldDateTime').value; // YYYY-MM-DDTHH:mm
-      const reason = document.getElementById('fieldReason').value;
-      const note = document.getElementById('fieldNote').value.trim();
-
-      // Format Date String YYMMDD + HH:mm
-      let formattedDT = rawDateTime;
-      if (rawDateTime) {
-        const d = new Date(rawDateTime);
-        const yy = String(d.getFullYear()).slice(-2);
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const hh = String(d.getHours()).padStart(2, '0');
-        const min = String(d.getMinutes()).padStart(2, '0');
-        formattedDT = `${yy}${mm}${dd} ${hh}:${min}`;
-      }
-
-      if (id) {
-        // Update
-        set(ref(db, `patrol_records/${id}`), {
-          ...window.recordsData.find(r => r.id === id),
-          code,
-          inspector,
-          dateTime: formattedDT,
-          reason,
-          note
-        });
-      } else {
-        // Add
-        const newRef = push(ref(db, 'patrol_records'));
-        set(newRef, {
-          code,
-          inspector,
-          dateTime: formattedDT,
-          reason,
-          note,
-          signature: '',
-          order: window.recordsData.length,
-          createdAt: serverTimestamp()
-        });
-      }
-
-      closeRecordModal();
+      update(ref(db, `patrol_records/${id}`), { signature: signString });
     };
 
     // Delete Record
@@ -885,7 +817,7 @@
           const firstSheet = workbook.SheetNames[0];
           const json = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
 
-          if (json.length > 0 && confirm(`準備匯入 ${json.length} 筆資料，將會覆蓋/追加至雲端，是否繼續？`)) {
+          if (json.length > 0 && confirm(`準備匯入 ${json.length} 筆資料，將會追加至雲端，是否繼續？`)) {
             json.forEach((row, idx) => {
               const newRef = push(ref(db, 'patrol_records'));
               set(newRef, {
